@@ -1,0 +1,37 @@
+name: build
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate project
+        run: |
+          MODS=$(find . -name mods.toml -path '*src/main/resources/META-INF*' | head -1)
+          echo "found: $MODS"
+          DIR=$(cd "$(dirname "$MODS")/../../../.." && pwd)
+          for f in build.gradle settings.gradle gradle.properties; do
+            [ -f "$DIR/$f" ] || cp "$GITHUB_WORKSPACE/$f" "$DIR/$f"
+          done
+          echo "DIR=$DIR" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.1.1
+
+      - name: Build
+        working-directory: ${{ env.DIR }}
+        run: gradle build --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paqgane-jar
+          path: ${{ env.DIR }}/build/libs/*.jar
